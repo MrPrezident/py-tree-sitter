@@ -234,6 +234,10 @@ class TestQuery(TestCase):
             function fun2(arg) {
                 return 2;
             }
+
+            function fun3(arg) {
+                return 3;
+            }
         """
 
         def read_callable_byte_offset(byte_offset, point):
@@ -260,19 +264,23 @@ class TestQuery(TestCase):
             """
             ((function_declaration
                 name: (identifier) @function-name)
-                (#eq? @function-name fun1))
+                (#match? @function-name "fun[12]"))
             """
         )
-        cursor = QueryCursor(query1)
-        captures1 = list(cursor.captures(root_node1).items())
+        cursor1 = QueryCursor(query1)
+        captures1 = cursor1.captures(root_node1)
         self.assertEqual(1, len(captures1))
-        self.assertEqual(captures1[0][0], "function-name")
-        self.assertEqual(captures1[0][1][0].text, b"fun1")
+        self.assertIn("function-name", captures1)
+        self.assertEqual(2, len(captures1["function-name"]))
+        self.assertEqual(captures1["function-name"][0].text, b"fun1")
+        self.assertEqual(captures1["function-name"][1].text, b"fun2")
 
-        captures2 = list(cursor.captures(root_node2).items())
+        captures2 = cursor1.captures(root_node2)
         self.assertEqual(1, len(captures2))
-        self.assertEqual(captures2[0][0], "function-name")
-        self.assertEqual(captures2[0][1][0].text, b"fun1")
+        self.assertIn("function-name", captures2)
+        self.assertEqual(2, len(captures2["function-name"]))
+        self.assertEqual(captures2["function-name"][0].text, b"fun1")
+        self.assertEqual(captures2["function-name"][1].text, b"fun2")
 
         # functions with name not equal to 'fun1' -> test for #not-eq? @capture string
         query2 = Query(
@@ -283,16 +291,20 @@ class TestQuery(TestCase):
                 (#not-eq? @function-name fun1))
             """
         )
-        cursor = QueryCursor(query2)
-        captures3 = list(cursor.captures(root_node1).items())
+        cursor2 = QueryCursor(query2)
+        captures3 = cursor2.captures(root_node1)
         self.assertEqual(1, len(captures3))
-        self.assertEqual(captures3[0][0], "function-name")
-        self.assertEqual(captures3[0][1][0].text, b"fun2")
+        self.assertIn("function-name", captures3)
+        self.assertEqual(2, len(captures3["function-name"]))
+        self.assertEqual(captures3["function-name"][0].text, b"fun2")
+        self.assertEqual(captures3["function-name"][1].text, b"fun3")
 
-        captures4 = list(cursor.captures(root_node2).items())
+        captures4 = cursor2.captures(root_node2)
         self.assertEqual(1, len(captures4))
-        self.assertEqual(captures4[0][0], "function-name")
-        self.assertEqual(captures4[0][1][0].text, b"fun2")
+        self.assertIn("function-name", captures4)
+        self.assertEqual(2, len(captures4["function-name"]))
+        self.assertEqual(captures4["function-name"][0].text, b"fun2")
+        self.assertEqual(captures4["function-name"][1].text, b"fun3")
 
     def test_text_predicates_errors(self):
         with self.assertRaises(QueryError):

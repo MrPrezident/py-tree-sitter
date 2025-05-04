@@ -597,31 +597,30 @@ PyObject *node_get_text(Node *self, void *Py_UNUSED(payload)) {
         TSPoint current_point = start_point;
 
         for (size_t current_offset = start_offset; current_offset < end_offset;) {
+            // Form arguments to callable.
             PyObject *byte_offset_obj = PyLong_FromSize_t(current_offset);
-            PyObject *row = PyLong_FromSize_t((size_t)current_point.row);
-            PyObject *column = PyLong_FromSize_t((size_t)current_point.column);
-            PyObject *point_obj = PyTuple_Pack(2, row, column);
-            Py_XDECREF(row);
-            Py_XDECREF(column);
-            if (!point_obj) {
-                Py_XDECREF(collected_bytes);
+            if (!byte_offset_obj) {
+                Py_DECREF(collected_bytes);
+                return NULL;
+            }
+            PyObject *position_obj = POINT_NEW(GET_MODULE_STATE(self), current_point);
+            if (!position_obj) {
+                Py_DECREF(byte_offset_obj);
+                Py_DECREF(collected_bytes);
                 return NULL;
             }
 
-            PyObject *args = PyTuple_Pack(2, byte_offset_obj, point_obj);
+            PyObject *args = PyTuple_Pack(2, byte_offset_obj, position_obj);
             Py_XDECREF(byte_offset_obj);
-            Py_XDECREF(point_obj);
+            Py_XDECREF(position_obj);
+
+            // Call callable.
             PyObject *rv = PyObject_Call(tree->source, args, NULL);
             Py_XDECREF(args);
-            if (rv == NULL || rv == Py_None || !PyBytes_Check(rv)) {
-                Py_XDECREF(rv);
-                Py_XDECREF(collected_bytes);
-                return NULL;
-            }
 
             PyObject *rv_bytearray = PyByteArray_FromObject(rv);
             if (rv_bytearray == NULL) {
-                Py_XDECREF(collected_bytes);
+                Py_DECREF(collected_bytes);
                 Py_XDECREF(rv);
                 return NULL;
             }
@@ -660,9 +659,11 @@ PyObject *node_get_text(Node *self, void *Py_UNUSED(payload)) {
         }
         result = PyObject_GetItem(collected_bytes, slice);
         Py_DECREF(slice);
-        Py_XDECREF(collected_bytes);
+        Py_DECREF(collected_bytes);
     }
-    return result;
+    PyObject *bytes_result = PyBytes_FromObject(result);
+    Py_DECREF(result);
+    return bytes_result;
 }
 
 Py_hash_t node_hash(Node *self) {
